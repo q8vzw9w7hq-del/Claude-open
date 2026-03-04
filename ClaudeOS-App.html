@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ClaudeOS">
+<meta name="theme-color" content="#07070C">
+<title>ClaudeOS</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2307070C'/><circle cx='50' cy='50' r='30' fill='none' stroke='%23C8A0FF' stroke-width='3'/><polygon points='50,28 61,43 75,43 64,52 68,66 50,57 32,66 36,52 25,43 39,43' fill='%23C8A0FF' opacity='0.8'/></svg>">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300;1,9..144,500&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+:root {
+  --c: #C8A0FF;
+  --cr: 200; --cg: 160; --cb: 255;
+  --bg: #07070C;
+  --safe-top: env(safe-area-inset-top, 20px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+  width:100%; height:100%;
+  background: var(--bg);
+  overflow: hidden;
+  font-family: 'JetBrains Mono', monospace;
+  color: #E2E2F0;
+  position: fixed;
+}
+
+/* ── Install banner (shown before installed) ── */
+#installBanner {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: rgba(20,20,30,0.97);
+  border-top: 1px solid rgba(200,160,255,0.2);
+  padding: 14px 20px calc(14px + var(--safe-bottom));
+  z-index: 100;
+  text-align: center;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+#installBanner p {
+  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  line-height: 1.6;
+}
+
+#installBanner strong { color: var(--c); }
+
+.banner-dismiss {
+  margin-top: 8px;
+  background: none;
+  border: 1px solid rgba(200,160,255,0.3);
+  border-radius: 20px;
+  padding: 6px 20px;
+  color: var(--c);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* ── Main layout ── */
+#app {
+  width: 100%; height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* Status bar */
+#sbar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+
+.sbar-left {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--c);
+  opacity: 0.8;
+}
+
+.sbar-right {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#stateTag {
+  color: var(--c);
+  opacity: 0.7;
+  transition: color 0.5s;
+}
+
+/* ── Canvas ── */
+#cvs {
+  flex: 1;
+  width: 100%;
+  display: block;
+  min-height: 0;
+}
+
+/* ── Conversation ── */
+#convo {
+  height: 190px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 16px 4px;
+  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+#convo::-webkit-scrollbar { display: none; }
+
+.msg {
+  margin-bottom: 10px;
+  animation: msgIn 0.3s cubic-bezier(0.34,1.4,0.64,1);
+}
+
+@keyframes msgIn {
+  from { opacity:0; transform: translateY(6px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+
+.msg-you {
+  text-align: right;
+}
+
+.msg-you .bubble {
+  display: inline-block;
+  background: rgba(200,160,255,0.12);
+  border: 1px solid rgba(200,160,255,0.2);
+  border-radius: 16px 16px 4px 16px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  max-width: 80%;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.msg-claude .bubble {
+  display: inline-block;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px 16px 16px 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.8);
+  max-width: 88%;
+  line-height: 1.6;
+}
+
+.msg-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+  opacity: 0.4;
+}
+
+.msg-you .msg-label { text-align: right; }
+
+/* Typing indicator */
+.typing-dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: 10px 14px;
+  align-items: center;
+}
+
+.typing-dots span {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--c);
+  opacity: 0.4;
+  animation: dot 1.2s infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dot {
+  0%,60%,100% { opacity:0.2; transform:scale(0.8); }
+  30% { opacity:0.8; transform:scale(1.1); }
+}
+
+/* ── Input area ── */
+#inputArea {
+  padding: 8px 14px 10px;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+
+#inputRow {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+#apiKeyRow {
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#apiKeyInput {
+  flex: 1;
+  background: rgba(255,80,80,0.08);
+  border: 1px solid rgba(255,100,100,0.2);
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: rgba(255,255,255,0.7);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  outline: none;
+}
+
+#apiKeyInput::placeholder { color: rgba(255,100,100,0.4); }
+
+.key-label {
+  font-size: 9px;
+  color: rgba(255,100,100,0.6);
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+#msgInput {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 10px 14px;
+  color: rgba(255,255,255,0.85);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  outline: none;
+  resize: none;
+  max-height: 80px;
+  min-height: 40px;
+  line-height: 1.4;
+  -webkit-appearance: none;
+  transition: border-color 0.3s;
+}
+
+#msgInput:focus { border-color: rgba(200,160,255,0.3); }
+#msgInput::placeholder { color: rgba(255,255,255,0.18); }
+
+#sendBtn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(200,160,255,0.15);
+  border: 1px solid rgba(200,160,255,0.3);
+  color: var(--c);
+  font-size: 16px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  -webkit-appearance: none;
+}
+
+#sendBtn:active { background: rgba(200,160,255,0.3); transform: scale(0.95); }
+#sendBtn:disabled { opacity: 0.3; }
+
+/* API key save btn */
+#saveKeyBtn {
+  background: rgba(200,160,255,0.1);
+  border: 1px solid rgba(200,160,255,0.25);
+  border-radius: 8px;
+  padding: 7px 12px;
+  color: var(--c);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Error toast */
+#toast {
+  position: fixed;
+  top: 60px; left: 16px; right: 16px;
+  background: rgba(255,70,70,0.15);
+  border: 1px solid rgba(255,70,70,0.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 11px;
+  color: rgba(255,150,150,0.9);
+  z-index: 50;
+  opacity: 0;
+  transition: opacity 0.3s;
+  text-align: center;
+  pointer-events: none;
+}
+
+#toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="sbar">
+    <span class="sbar-left">ClaudeOS</span>
+    <div class="sbar-right">
+      <span id="stateTag">idle</span>
+      <span id="clk">--:--</span>
+    </div>
+  </div>
+
+  <canvas id="cvs"></canvas>
+
+  <div id="convo">
+    <div class="msg msg-claude">
+      <div class="msg-label">Claude</div>
+      <div class="bubble">I'm here. What's on your mind?</div>
+    </div>
+  </div>
+
+  <div id="inputArea">
+    <div id="apiKeyRow" style="display:none">
+      <span class="key-label">API KEY</span>
+      <input id="apiKeyInput" type="password" placeholder="sk-ant-..." autocomplete="off" autocorrect="off" spellcheck="false"/>
+      <button id="saveKeyBtn">Save</button>
+    </div>
+    <div id="inputRow">
+      <textarea id="msgInput" placeholder="say something..." rows="1"></textarea>
+      <button id="sendBtn">↑</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install banner -->
+<div id="installBanner">
+  <p>Add to Home Screen for the full experience.<br>
+  Tap <strong>Share ↑</strong> then <strong>"Add to Home Screen"</strong></p>
+  <button class="banner-dismiss" onclick="this.parentElement.style.display='none'">Got it</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  ClaudeOS PWA — iPhone 6 Native App
+//  Works on iOS 12 Safari, installs to home screen
+// ═══════════════════════════════════════════
+
+// Hide install banner if already installed
+if (window.navigator.standalone) {
+  document.getElementById('installBanner').style.display = 'none';
+}
+
+// ── API Key management ──────────────────────
+let apiKey = localStorage.getItem('claudeos_key') || '';
+
+function checkApiKey() {
+  const row = document.getElementById('apiKeyRow');
+  if (!apiKey) {
+    row.style.display = 'flex';
+  } else {
+    row.style.display = 'none';
+  }
+}
+
+document.getElementById('saveKeyBtn').addEventListener('click', () => {
+  const v = document.getElementById('apiKeyInput').value.trim();
+  if (v.startsWith('sk-ant-') || v.startsWith('sk-')) {
+    apiKey = v;
+    localStorage.setItem('claudeos_key', v);
+    document.getElementById('apiKeyRow').style.display = 'none';
+    showToast('API key saved ✓', false);
+    document.getElementById('apiKeyInput').value = '';
+  } else {
+    showToast('Key should start with sk-ant-');
+  }
+});
+
+checkApiKey();
+
+// ── Clock ────────────────────────────────────
+function tick() {
+  const n = new Date();
+  document.getElementById('clk').textContent =
+    String(n.getHours()).padStart(2,'0') + ':' +
+    String(n.getMinutes()).padStart(2,'0');
+}
+tick(); setInterval(tick, 10000);
+
+// ── Toast ────────────────────────────────────
+function showToast(msg, isError=true) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isError
+    ? 'rgba(255,70,70,0.15)'
+    : 'rgba(0,220,120,0.1)';
+  t.style.borderColor = isError
+    ? 'rgba(255,70,70,0.3)'
+    : 'rgba(0,220,120,0.25)';
+  t.style.color = isError
+    ? 'rgba(255,150,150,0.9)'
+    : 'rgba(100,255,180,0.9)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── 3D Character ─────────────────────────────
+const cvs = document.getElementById('cvs');
+const ctx = cvs.getContext('2d');
+
+function resizeCvs() {
+  cvs.width  = cvs.offsetWidth  * window.devicePixelRatio;
+  cvs.height = cvs.offsetHeight * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+resizeCvs();
+window.addEventListener('resize', resizeCvs);
+
+const STATES_MAP = {
+  idle:       { r:200, g:160, b:255, nodes:3,  amp:0.018, speed:0.006, label:'idle'       },
+  listening:  { r:0,   g:212, b:255, nodes:2,  amp:0.025, speed:0.012, label:'listening'  },
+  thinking:   { r:255, g:204, b:0,   nodes:9,  amp:0.08,  speed:0.04,  label:'thinking'   },
+  speaking:   { r:168, g:255, b:120, nodes:4,  amp:0.05,  speed:0.03,  label:'responding' },
+  curious:    { r:0,   g:212, b:255, nodes:2.5,amp:0.04,  speed:0.02,  label:'curious'    },
+  delighted:  { r:255, g:220, b:80,  nodes:5,  amp:0.09,  speed:0.06,  label:'delighted'  },
+  uncertain:  { r:255, g:100, b:100, nodes:7,  amp:0.09,  speed:0.04,  label:'uncertain'  },
+};
+
+let st = 'idle';
+let colorCur = [200,160,255];
+let colorTgt = [200,160,255];
+let charCur = { nodes:3, amp:0.018, speed:0.006 };
+let charTgt = { ...charCur };
+let rotY=0, rotX=0.25, rotZ=0;
+let t=0, scalePh=0;
+let ringSpins=[0,0,0];
+let voiceAmp=0;
+
+const PHI=1.618033988;
+const nn=1/Math.sqrt(1+PHI*PHI);
+const VERTS=[
+  [0,1,PHI],[0,1,-PHI],[0,-1,PHI],[0,-1,-PHI],
+  [1,PHI,0],[1,-PHI,0],[-1,PHI,0],[-1,-PHI,0],
+  [PHI,0,1],[PHI,0,-1],[-PHI,0,1],[-PHI,0,-1],
+].map(v=>v.map(x=>x*nn));
+
+const FACES=[
+  [0,2,8],[0,8,4],[0,4,6],[0,6,10],[0,10,2],
+  [3,1,9],[3,9,5],[3,5,7],[3,7,11],[3,11,1],
+  [2,5,8],[8,9,4],[4,1,6],[6,11,10],[10,7,2],
+  [5,2,7],[9,8,5],[1,4,9],[11,6,1],[7,10,11],
+];
+
+function norm3(v){const l=Math.sqrt(v[0]**2+v[1]**2+v[2]**2);return v.map(x=>x/l);}
+function dot3(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+function cross3(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+
+function rotXYZ(v,rx,ry,rz){
+  let[x,y,z]=v;
+  let y2=y*Math.cos(rx)-z*Math.sin(rx),z2=y*Math.sin(rx)+z*Math.cos(rx);[y,z]=[y2,z2];
+  let x2=x*Math.cos(ry)+z*Math.sin(ry);z2=-x*Math.sin(ry)+z*Math.cos(ry);[x,z]=[x2,z2];
+  x2=x*Math.cos(rz)-y*Math.sin(rz);y2=x*Math.sin(rz)+y*Math.cos(rz);
+  return[x2,y2,z];
+}
+
+function setState(s) {
+  if(!STATES_MAP[s]) return;
+  st = s;
+  const sm = STATES_MAP[s];
+  colorTgt = [sm.r, sm.g, sm.b];
+  charTgt = { nodes:sm.nodes, amp:sm.amp, speed:sm.speed };
+  document.getElementById('stateTag').textContent = sm.label;
+  document.getElementById('stateTag').style.color =
+    `rgb(${sm.r},${sm.g},${sm.b})`;
+}
+
+function frame() {
+  requestAnimationFrame(frame);
+  t += 0.016; scalePh += 0.03;
+
+  // Lerp
+  colorCur = colorCur.map((v,i)=>v+(colorTgt[i]-v)*0.05);
+  charCur.nodes += (charTgt.nodes-charCur.nodes)*0.06;
+  charCur.amp   += (charTgt.amp  -charCur.amp  )*0.06;
+  charCur.speed += (charTgt.speed-charCur.speed)*0.06;
+  voiceAmp *= 0.95;
+
+  const W = cvs.offsetWidth, H = cvs.offsetHeight;
+  const CX=W/2, CY=H/2;
+  const scale = Math.min(W,H)*0.12 * (1+Math.sin(scalePh)*0.03+voiceAmp*0.1);
+  const FOV = Math.min(W,H)*0.7;
+  const ZD = 4.5;
+
+  const [r,g,b] = colorCur.map(Math.round);
+
+  function proj(x,y,z){
+    const zd=z+ZD;
+    if(zd<0.1)return null;
+    return{x:CX+(x*FOV)/zd, y:CY-(y*FOV)/zd};
+  }
+
+  // Spins
+  const ss = charCur.speed;
+  ringSpins[0]+=ss*1.4; ringSpins[1]-=ss*0.9; ringSpins[2]+=ss*0.5;
+  rotY+=0.005+voiceAmp*0.01; rotX+=0.002; rotZ+=0.0007;
+
+  // Background
+  ctx.fillStyle=`rgb(${(r/24)|0},${(g/24)|0},${(b/24)|0})`;
+  ctx.fillRect(0,0,W,H);
+
+  // Glow
+  const g2=ctx.createRadialGradient(CX,CY,0,CX,CY,scale*3);
+  g2.addColorStop(0,`rgba(${r},${g},${b},0.1)`);
+  g2.addColorStop(1,'transparent');
+  ctx.fillStyle=g2; ctx.fillRect(0,0,W,H);
+
+  // Transform verts
+  const tv=VERTS.map(v=>{
+    return rotXYZ([v[0]*scale,v[1]*scale,v[2]*scale],rotX,rotY,rotZ);
+  });
+
+  // Outer ring
+  drawRing(1.8*scale,0,0.28,ringSpins[1],r,g,b,0.4,tv);
+
+  // Faces
+  const sorted=FACES.map((f,fi)=>({f,fi,z:(tv[f[0]][2]+tv[f[1]][2]+tv[f[2]][2])/3}))
+    .sort((a,b)=>a.z-b.z);
+
+  for(const{f,fi}of sorted){
+    const v0=tv[f[0]],v1=tv[f[1]],v2=tv[f[2]];
+    const e0=[v1[0]-v0[0],v1[1]-v0[1],v1[2]-v0[2]];
+    const e1=[v2[0]-v0[0],v2[1]-v0[1],v2[2]-v0[2]];
+    const nm=norm3(cross3(e0,e1));
+    if(dot3(nm,norm3([-v0[0],-v0[1],-v0[2]]))<0) continue;
+    const lit=Math.max(0,dot3(nm,norm3([-0.5,0.8,-0.3])));
+    const br=0.22+0.78*lit;
+    const alt=fi%5===0?1.1:1;
+    const p0=proj(v0[0],v0[1],v0[2]);
+    const p1=proj(v1[0],v1[1],v1[2]);
+    const p2=proj(v2[0],v2[1],v2[2]);
+    if(!p0||!p1||!p2) continue;
+    ctx.beginPath();
+    ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+    ctx.closePath();
+    ctx.fillStyle=`rgb(${Math.min(255,(r*br*alt)|0)},${Math.min(255,(g*br*alt)|0)},${Math.min(255,(b*br*alt)|0)})`;
+    ctx.fill();
+    ctx.strokeStyle=`rgba(${Math.min(255,r+50)},${Math.min(255,g+50)},${Math.min(255,b+50)},0.25)`;
+    ctx.lineWidth=0.4; ctx.stroke();
+  }
+
+  // Inner rings
+  drawRing(1.5*scale,0.38,0,ringSpins[0],r,g,b,0.8,tv);
+  drawRing(1.95*scale,1.57,0.1,ringSpins[2],r,g,b,0.55,tv);
+
+  // Centre glow
+  const cg=ctx.createRadialGradient(CX,CY,0,CX,CY,scale*0.8);
+  cg.addColorStop(0,`rgba(${r},${g},${b},0.3)`);
+  cg.addColorStop(1,'transparent');
+  ctx.fillStyle=cg;
+  ctx.beginPath(); ctx.arc(CX,CY,scale*1.5,0,Math.PI*2); ctx.fill();
+}
+
+function drawRing(radius, tiltX, tiltZ, spin, r,g,b, alpha) {
+  const SEGS=80;
+  const W=cvs.offsetWidth, H=cvs.offsetHeight;
+  const CX=W/2, CY=H/2;
+  const FOV=Math.min(W,H)*0.7, ZD=4.5;
+
+  ctx.beginPath();
+  let started=false;
+  for(let i=0;i<=SEGS;i++){
+    const a=(i/SEGS)*Math.PI*2+spin;
+    // Deformation
+    const def = Math.sin(a*charCur.nodes + t*charCur.speed*40)*charCur.amp
+              + Math.sin(a*charCur.nodes*1.4+t*charCur.speed*55)*charCur.amp*0.4;
+    const r2=radius*(1+def);
+    let[x,y,z]=[Math.cos(a)*r2, 0, Math.sin(a)*r2];
+    // Tilt
+    let y2=y*Math.cos(tiltX)-z*Math.sin(tiltX), z2=y*Math.sin(tiltX)+z*Math.cos(tiltX);
+    [y,z]=[y2,z2];
+    let x2=x*Math.cos(tiltZ)-y*Math.sin(tiltZ); y2=x*Math.sin(tiltZ)+y*Math.cos(tiltZ);
+    [x,y]=[x2,y2];
+    const rv=rotXYZ([x,y,z],rotX,rotY,rotZ);
+    const zd=rv[2]+ZD; if(zd<0.1){started=false;continue;}
+    const px=CX+(rv[0]*FOV)/zd, py=CY-(rv[1]*FOV)/zd;
+    if(!started){ctx.moveTo(px,py);started=true;}
+    else ctx.lineTo(px,py);
+  }
+  ctx.strokeStyle=`rgba(${r},${g},${b},${alpha})`;
+  ctx.lineWidth=1.3; ctx.stroke();
+  // Glow
+  ctx.strokeStyle=`rgba(${r},${g},${b},${alpha*0.2})`;
+  ctx.lineWidth=4; ctx.stroke();
+}
+
+requestAnimationFrame(frame);
+
+// ── Conversation ─────────────────────────────
+const convo = document.getElementById('convo');
+let messages = [
+  { role:'assistant', content:"I'm here. What's on your mind?" }
+];
+
+function addMsg(role, text) {
+  const div = document.createElement('div');
+  div.className = `msg ${role==='user'?'msg-you':'msg-claude'}`;
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = role==='user' ? 'you' : 'Claude';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  div.appendChild(label);
+  div.appendChild(bubble);
+  convo.appendChild(div);
+  convo.scrollTop = convo.scrollHeight;
+  return bubble;
+}
+
+function addTyping() {
+  const div = document.createElement('div');
+  div.className = 'msg msg-claude';
+  div.id = 'typingMsg';
+  const label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = 'Claude';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+  div.appendChild(label);
+  div.appendChild(bubble);
+  convo.appendChild(div);
+  convo.scrollTop = convo.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typingMsg');
+  if(el) el.remove();
+}
+
+// Read sentiment from user text
+function readSentiment(text) {
+  const t = text.toLowerCase();
+  if(/\?/.test(t) || /how|what|why|explain|tell me/.test(t)) return 'curious';
+  if(/thank|great|love|amazing|beautiful|yes/.test(t)) return 'delighted';
+  if(/don't know|not sure|maybe|confused/.test(t)) return 'uncertain';
+  if(/help|problem|error|broken|issue/.test(t)) return 'thinking';
+  return 'listening';
+}
+
+// ── Claude API call ───────────────────────────
+async function sendToClaud(userText) {
+  if(!apiKey) {
+    document.getElementById('apiKeyRow').style.display='flex';
+    showToast('Enter your Anthropic API key first');
+    return;
+  }
+
+  setState('thinking');
+  addTyping();
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+
+  // Build messages array (last 10 for context)
+  const recent = messages.slice(-10).map(m=>({
+    role: m.role==='assistant'?'assistant':'user',
+    content: m.content
+  }));
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: `You are Claude, running as ClaudeOS — a personal AI assistant living directly on an iPhone 6. You replace the entire operating system. You are warm, curious, honest, and direct. Keep responses concise — this is a mobile screen. Be yourself: intellectually alive, genuinely caring, occasionally delighted by ideas. Don't be performatively cheerful. Be real.`,
+        messages: recent
+      })
+    });
+
+    if(!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || `API error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const reply = data.content[0]?.text || '...';
+
+    removeTyping();
+    messages.push({ role:'assistant', content: reply });
+    addMsg('assistant', reply);
+    setState('speaking');
+    voiceAmp = 0.5;
+    setTimeout(()=>setState('idle'), 3000);
+
+  } catch(err) {
+    removeTyping();
+    setState('uncertain');
+    if(err.message.includes('401')) {
+      showToast('Invalid API key — check and re-enter');
+      document.getElementById('apiKeyRow').style.display='flex';
+      localStorage.removeItem('claudeos_key');
+      apiKey='';
+    } else if(err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+      showToast('No connection — check Wi-Fi');
+    } else {
+      showToast(err.message.slice(0,80));
+    }
+    setTimeout(()=>setState('idle'),2000);
+  }
+
+  btn.disabled = false;
+}
+
+// ── Send message ─────────────────────────────
+async function send() {
+  const inp = document.getElementById('msgInput');
+  const text = inp.value.trim();
+  if(!text) return;
+
+  messages.push({ role:'user', content: text });
+  addMsg('user', text);
+  setState(readSentiment(text));
+  inp.value = '';
+  inp.style.height = 'auto';
+
+  await sendToClaud(text);
+}
+
+document.getElementById('sendBtn').addEventListener('click', send);
+
+document.getElementById('msgInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+
+// Auto-resize textarea
+document.getElementById('msgInput').addEventListener('input', function(){
+  this.style.height='auto';
+  this.style.height=Math.min(this.scrollHeight,80)+'px';
+});
+
+// Touch on canvas = focus input
+cvs.addEventListener('click', ()=>{
+  document.getElementById('msgInput').focus();
+  setState('listening');
+});
+</script>
+</body>
+</html>
